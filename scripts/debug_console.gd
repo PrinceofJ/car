@@ -252,7 +252,8 @@ func _regen_track(seed_val: int) -> void:
 		else:
 			touge.rng.seed = randi()
 		touge.road_points.clear()
-		touge.road_directions.clear()
+		touge.road_rights.clear()
+		touge.road_forwards.clear()
 		touge.generate()
 		_log("[color=green]Track regenerated (seed: " + str(touge.rng.seed) + ")[/color]")
 	else:

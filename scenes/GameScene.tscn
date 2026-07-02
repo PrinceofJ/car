@@ -100,6 +100,20 @@ skeleton = NodePath("../..")
 transform = Transform3D(1, -7.1054274e-15, 4.2351647e-22, 0, -4.371139e-08, -1, 7.1054274e-15, 1, -4.371139e-08, 0, 1.3046767, -2.32)
 shape = SubResource("CapsuleShape3D_ed8b8")
 
+[node name="SpotLight3D2" type="SpotLight3D" parent="RetroDisplay/WorldViewport/Car" unique_id=740303442]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.8452251, 0.9557537, -5.378865)
+light_energy = 16.0
+spot_range = 4096.0
+spot_attenuation = 1.6
+spot_angle = 26.46
+
+[node name="SpotLight3D" type="SpotLight3D" parent="RetroDisplay/WorldViewport/Car" unique_id=133020218]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.66668403, 0.9580708, -5.5669994)
+light_energy = 16.0
+spot_range = 4096.0
+spot_attenuation = 1.6
+spot_angle = 26.46
+
 [node name="GameManager" type="Node" parent="RetroDisplay/WorldViewport" unique_id=1594595211 node_paths=PackedStringArray("car", "map_generator", "test_floor")]
 script = ExtResource("5_w22tq")
 car = NodePath("../Car")
@@ -111,6 +125,7 @@ script = ExtResource("6_e8rlm")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="RetroDisplay/WorldViewport" unique_id=1176574857]
 transform = Transform3D(0.86601907, -0.3535631, 0.3535593, 0, 0.70710295, 0.7071106, -0.500011, -0.61237127, 0.61236465, 0, 50, 0)
+light_energy = 0.1
 shadow_enabled = true
 
 [node name="SkidMarks" type="Node3D" parent="RetroDisplay/WorldViewport" unique_id=1552121723 node_paths=PackedStringArray("car")]

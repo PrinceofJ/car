@@ -8,18 +8,32 @@ extends Node3D
 @export var guardrail_height: float = 1.2
 
 @export_group("Curvature")
-@export var max_turn_angle: float = 25.0
-@export var hairpin_chance: float = 0.08
-@export var hairpin_segments: int = 8
+@export var max_turn_angle: float = 14.0        # cap on how sharp a normal curve can get (deg/segment)
+@export var turn_jitter: float = 3.5            # how much the steering can change each segment (deg)
+@export var turn_damping: float = 0.07          # how strongly curves ease back toward straight
+@export var hairpin_chance: float = 0.05
+@export var hairpin_segments: int = 10
 @export var subdivisions: int = 3
-@export var heading_bounce_back: float = 0.12
-@export var max_heading_deviation: float = 100.0
-@export var hairpin_cooldown_segments: int = 14
+@export var heading_bounce_back: float = 0.05
+@export var hairpin_cooldown_segments: int = 18
 
 @export_group("Self-Overlap Guard")
 @export var min_self_distance: float = 14.0
 @export var self_check_min_gap: int = 10
 @export var max_generation_attempts: int = 25
+
+@export_group("Scenery")
+@export var enable_signs: bool = true
+@export var sharp_turn_threshold: float = 38.0   # heading change (deg) that warrants a warning sign
+@export var sign_lookahead: int = 6              # how far ahead to sample the upcoming turn
+@export var sign_spacing: int = 12               # min segments between signs
+@export var sign_setback: int = 5                # place the sign this many points before the turn
+@export var sign_margin: float = 0.8             # gap from road edge to the post
+@export var sign_post_height: float = 2.4
+@export var sign_size: float = 1.1               # warning-diamond half-height
+@export var cliff_depth: float = 70.0            # how far the drop-side cliff falls
+@export var cliff_edge_width: float = 1.5        # flat verge before the drop
+@export var cliff_run: float = 4.0               # horizontal run of the cliff face (smaller = steeper)
 
 var rng: RandomNumberGenerator
 var road_points: Array[Vector3] = []
@@ -38,6 +52,7 @@ func generate() -> void:
 	_compute_frames()
 	_build_road_mesh()
 	_build_terrain()
+	_build_signs()
 
 func _build_centerline() -> void:
 	var best_points: Array[Vector3] = []
@@ -59,9 +74,11 @@ func _generate_centerline_candidate() -> Array[Vector3]:
 
 	var pos := Vector3.ZERO
 	var angle := 0.0
+	var turn_rate := 0.0
 	var elevation := 0.0
 	var elev_per_seg := elevation_gain / float(segment_count)
-	var max_dev := deg_to_rad(max_heading_deviation)
+	var max_rate := deg_to_rad(max_turn_angle)
+	var jitter := deg_to_rad(turn_jitter)
 
 	# Keeps consecutive hairpins from stacking on top of each other and biases
 	# each new hairpin to swing the opposite way from the last one, so the
@@ -80,24 +97,36 @@ func _generate_centerline_candidate() -> Array[Vector3]:
 				hairpin_dir = -last_hairpin_dir
 			last_hairpin_dir = hairpin_dir
 
-			var total_turn := deg_to_rad(rng.randf_range(140.0, 170.0)) * hairpin_dir
+			var total_turn := deg_to_rad(rng.randf_range(140.0, 165.0)) * hairpin_dir
 			var turn_per_seg := total_turn / float(hairpin_segments)
 			for _j in hairpin_segments:
 				angle += turn_per_seg
-				var elev_step := elev_per_seg * rng.randf_range(0.6, 1.4)
+				var elev_step := elev_per_seg * rng.randf_range(0.85, 1.15)
 				elevation += elev_step
 				pos += Vector3(sin(angle) * segment_length, -elev_step, cos(angle) * segment_length)
 				points.append(pos)
+			# Exit the hairpin heading straight instead of inheriting old steering.
+			turn_rate = 0.0
 			i += hairpin_segments
 			segments_since_hairpin = 0
 		else:
-			var turn := deg_to_rad(rng.randf_range(-max_turn_angle, max_turn_angle))
-			# Mean-revert heading back toward "straight ahead" and cap total
-			# deviation so ordinary curves can't random-walk into a full loop.
-			angle = angle * (1.0 - heading_bounce_back) + turn
-			angle = clampf(angle, -max_dev, max_dev)
+			# Smoothly-varying steering: the turn RATE drifts a little each
+			# segment and eases back toward straight, so curves flow in, hold,
+			# and ease out - instead of the heading jumping to a fresh random
+			# angle every step (which is what made the road snake constantly).
+			turn_rate += rng.randf_range(-jitter, jitter)
+			turn_rate *= (1.0 - turn_damping)
+			turn_rate = clampf(turn_rate, -max_rate, max_rate)
 
-			var elev_step := elev_per_seg * rng.randf_range(0.6, 1.4)
+			angle += turn_rate
+			# Wrap, then ease heading the short way back toward the descent axis.
+			# No hard clamp: a hard cap would snap the heading (and kink the road)
+			# right after a hairpin, which legitimately leaves it pointing ~180
+			# from downhill. The gentle pull lets switchbacks recover naturally.
+			angle = wrapf(angle, -PI, PI)
+			angle *= (1.0 - heading_bounce_back)
+
+			var elev_step := elev_per_seg * rng.randf_range(0.85, 1.15)
 			elevation += elev_step
 			pos += Vector3(sin(angle) * segment_length, -elev_step, cos(angle) * segment_length)
 			points.append(pos)
@@ -299,27 +328,45 @@ func _build_terrain() -> void:
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 
 	var edge_offset := road_width * 0.5
+
+	# Uphill embankment (+right): gentle, drivable rise. Cliff (-right): a narrow
+	# verge, then a near-vertical face dropping far to a valley floor - steeper
+	# than the car's floor_max_angle, so leaving the road here means falling.
 	var shoulder_w := 3.0
-	var terrain_w := 60.0
+	var embank_w := 40.0
+	var embank_rise := 8.0
+	var valley_w := 40.0
 
-	# Flat shoulder flush with road, then sloped terrain beyond
-	for side: float in [-1.0, 1.0]:
-		for i in road_points.size() - 1:
-			var r0 := road_rights[i]
-			var r1 := road_rights[i + 1]
+	for i in road_points.size() - 1:
+		var r0 := road_rights[i]
+		var r1 := road_rights[i + 1]
+		var p0 := road_points[i]
+		var p1 := road_points[i + 1]
 
-			var re0: Vector3 = road_points[i] + r0 * edge_offset * side
-			var re1: Vector3 = road_points[i + 1] + r1 * edge_offset * side
-			var sh0: Vector3 = re0 + r0 * shoulder_w * side
-			var sh1: Vector3 = re1 + r1 * shoulder_w * side
+		# --- Uphill embankment side (+right) ---
+		var ure0 := p0 + r0 * edge_offset
+		var ure1 := p1 + r1 * edge_offset
+		var ush0 := ure0 + r0 * shoulder_w
+		var ush1 := ure1 + r1 * shoulder_w
+		_quad(st, ure0, ush0, ush1, ure1, Vector3.UP)
+		var uo0 := ush0 + r0 * embank_w + Vector3.UP * embank_rise
+		var uo1 := ush1 + r1 * embank_w + Vector3.UP * embank_rise
+		_quad(st, ush0, uo0, uo1, ush1, Vector3.UP)
 
-			_quad(st, re0, sh0, sh1, re1, Vector3.UP)
+		# --- Cliff side (-right) ---
+		var cre0 := p0 - r0 * edge_offset
+		var cre1 := p1 - r1 * edge_offset
+		var cv0 := cre0 - r0 * cliff_edge_width
+		var cv1 := cre1 - r1 * cliff_edge_width
+		_quad(st, cre0, cre1, cv1, cv0, Vector3.UP)               # flat verge
 
-			var drop := -12.0 if side < 0 else 8.0
-			var o0: Vector3 = sh0 + r0 * terrain_w * side + Vector3.UP * drop
-			var o1: Vector3 = sh1 + r1 * terrain_w * side + Vector3.UP * drop
+		var cb0 := cv0 - r0 * cliff_run + Vector3.DOWN * cliff_depth
+		var cb1 := cv1 - r1 * cliff_run + Vector3.DOWN * cliff_depth
+		_quad(st, cv0, cv1, cb1, cb0, (-r0).normalized())         # steep face
 
-			_quad(st, sh0, o0, o1, sh1, Vector3.UP)
+		var vf0 := cb0 - r0 * valley_w
+		var vf1 := cb1 - r1 * valley_w
+		_quad(st, cb0, cb1, vf1, vf0, Vector3.UP)                 # valley floor
 
 	var mesh := st.commit()
 	var mi := MeshInstance3D.new()
@@ -339,6 +386,92 @@ func _build_terrain() -> void:
 	col.shape = shape
 	body.add_child(col)
 	add_child(body)
+
+func _build_signs() -> void:
+	if not enable_signs or road_forwards.size() < sign_lookahead + 2:
+		return
+
+	var post_st := SurfaceTool.new()
+	post_st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var panel_st := SurfaceTool.new()
+	panel_st.begin(Mesh.PRIMITIVE_TRIANGLES)
+
+	var thresh := deg_to_rad(sharp_turn_threshold)
+	var last_sign := -sign_spacing
+	var placed := 0
+
+	for i in range(1, road_points.size() - sign_lookahead - 1):
+		if i - last_sign < sign_spacing:
+			continue
+
+		# Heading change over the lookahead window flags a sharp corner
+		var f_here := road_forwards[i]
+		var f_ahead := road_forwards[i + sign_lookahead]
+		var turn := Vector2(f_here.x, f_here.z).angle_to(Vector2(f_ahead.x, f_ahead.z))
+		if absf(turn) < thresh:
+			continue
+
+		# Place the sign a bit before the turn, on the uphill (safe) side
+		var idx := maxi(i - sign_setback, 1)
+		_add_sign(post_st, panel_st, idx)
+		last_sign = i
+		placed += 1
+
+	if placed == 0:
+		return
+
+	var post_mesh := post_st.commit()
+	var post_mi := MeshInstance3D.new()
+	post_mi.mesh = post_mesh
+	var post_mat := StandardMaterial3D.new()
+	post_mat.albedo_color = Color(0.38, 0.38, 0.42)
+	post_mat.roughness = 0.7
+	post_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	post_mi.material_override = post_mat
+	add_child(post_mi)
+
+	var panel_mesh := panel_st.commit()
+	var panel_mi := MeshInstance3D.new()
+	panel_mi.mesh = panel_mesh
+	var panel_mat := StandardMaterial3D.new()
+	panel_mat.albedo_color = Color(0.96, 0.78, 0.09)
+	panel_mat.roughness = 0.4
+	panel_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	panel_mi.material_override = panel_mat
+	add_child(panel_mi)
+
+func _add_sign(post_st: SurfaceTool, panel_st: SurfaceTool, idx: int) -> void:
+	var r := road_rights[idx]
+	var fwd := road_forwards[idx]
+	var base: Vector3 = road_points[idx] + r * (road_width * 0.5 + sign_margin)
+
+	# Vertical post
+	_box_column(post_st, base, r, fwd, 0.09, sign_post_height)
+
+	# Warning diamond on top, facing back down the road toward oncoming drivers
+	var center := base + Vector3.UP * sign_post_height
+	var s := sign_size
+	var top := center + Vector3.UP * s
+	var bot := center - Vector3.UP * s
+	var lft := center - r * s
+	var rgt := center + r * s
+	var normal := (-Vector3(fwd.x, 0.0, fwd.z)).normalized()
+	_quad(panel_st, top, rgt, bot, lft, normal)
+
+func _box_column(st: SurfaceTool, base: Vector3, right: Vector3, fwd: Vector3, half: float, height: float) -> void:
+	var rt := Vector3(right.x, 0.0, right.z).normalized()
+	var f := Vector3(fwd.x, 0.0, fwd.z).normalized()
+	var corners := [
+		base - rt * half - f * half,
+		base + rt * half - f * half,
+		base + rt * half + f * half,
+		base - rt * half + f * half,
+	]
+	var up := Vector3.UP * height
+	for k in 4:
+		var a: Vector3 = corners[k]
+		var b: Vector3 = corners[(k + 1) % 4]
+		_quad(st, a, b, b + up, a + up, (a - base).normalized())
 
 func get_spawn_position() -> Vector3:
 	if road_points.size() > 0:
