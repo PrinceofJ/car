@@ -1,0 +1,66 @@
+[gd_scene load_steps=5 format=3 uid="uid://cw7fa15xe8eok"]
+
+[ext_resource type="Theme" uid="uid://borx7v1oj4xbe" path="res://assets/themes/loss_graph/loss_graph_dark.tres" id="1_treko"]
+[ext_resource type="Script" uid="uid://dnqehf7mhtl2p" path="res://scripts/visuals/loss_graph/epoch_metric_graph_panel.gd" id="2_o6oof"]
+[ext_resource type="Script" uid="uid://ckslrqyk8o8rk" path="res://scripts/visuals/loss_graph/grid_layer.gd" id="3_0lflx"]
+[ext_resource type="Script" uid="uid://1t0u6ccmqp0s" path="res://scripts/visuals/loss_graph/epoch_metric_graph.gd" id="4_0aj26"]
+
+[node name="LossGraphPanel" type="PanelContainer" node_paths=PackedStringArray("graph_node", "title_label", "metric_value_label", "epoch_value_label")]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = ExtResource("1_treko")
+theme_type_variation = &"Background"
+script = ExtResource("2_o6oof")
+graph_node = NodePath("VBoxContainer/graph_container/Graph")
+title_label = NodePath("VBoxContainer/HBoxContainer/Title")
+metric_value_label = NodePath("VBoxContainer/HBoxContainer/Metric")
+epoch_value_label = NodePath("VBoxContainer/HBoxContainer/Epoch")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="."]
+layout_mode = 2
+
+[node name="HBoxContainer" type="VBoxContainer" parent="VBoxContainer"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="VBoxContainer/HBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 6
+theme_type_variation = &"LabelTitle"
+text = "Loss over epochs"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Metric" type="Label" parent="VBoxContainer/HBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 8
+theme_type_variation = &"LabelInfo"
+text = "Loss : 10.000"
+horizontal_alignment = 2
+vertical_alignment = 1
+
+[node name="Epoch" type="Label" parent="VBoxContainer/HBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 8
+theme_type_variation = &"LabelInfo"
+text = "epoch : 10.000"
+horizontal_alignment = 2
+vertical_alignment = 1
+
+[node name="graph_container" type="PanelContainer" parent="VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_type_variation = &"Graph"
+
+[node name="Grid" type="Control" parent="VBoxContainer/graph_container"]
+layout_mode = 2
+script = ExtResource("3_0lflx")
+
+[node name="Graph" type="Control" parent="VBoxContainer/graph_container" node_paths=PackedStringArray("grid")]
+layout_mode = 2
+mouse_filter = 1
+script = ExtResource("4_0aj26")
+grid = NodePath("../Grid")

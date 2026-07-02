@@ -1,0 +1,161 @@
+[gd_scene format=3 uid="uid://bx8pfr7xgtu4f"]
+
+[ext_resource type="Script" uid="uid://be5i83agtssbe" path="res://scripts/car_movement.gd" id="1_pynjx"]
+[ext_resource type="Script" uid="uid://biniqrlruaqng" path="res://scripts/camera.gd" id="2_yrli1"]
+[ext_resource type="Texture2D" uid="uid://ca4j2wwbmk2cw" path="res://assets/PSX_Style_Cars_by_GGBot_(August2023)/Car 02/car2_red.png" id="3_j40tv"]
+[ext_resource type="ArrayMesh" uid="uid://br73ke2loask" path="res://assets/PSX_Style_Cars_by_GGBot_(August2023)/Car 02/Car2.obj" id="4_6pl24"]
+[ext_resource type="Script" uid="uid://brh2bssbqlivk" path="res://scripts/game_manager.gd" id="5_w22tq"]
+[ext_resource type="Script" uid="uid://du0ck45rt5cdo" path="res://scripts/touge_generator.gd" id="6_e8rlm"]
+[ext_resource type="Script" uid="uid://vd50b4n1tia4" path="res://scripts/debug_console.gd" id="7_qitmq"]
+[ext_resource type="Script" uid="uid://6s6hpewxhk6m" path="res://scripts/skid_marks.gd" id="8_kxqg4"]
+[ext_resource type="Texture2D" uid="uid://cv0dahngrhyon" path="res://assets/vector-grid-marking-user-hud-interface_1284-52212.png" id="9_21xg8"]
+[ext_resource type="Texture2D" uid="uid://ctf6i5qrtghph" path="res://adcvq7cfkgu16c8asek54nboqs-7849c90e685cfc97bcc81d3fb1db0e5a.png" id="10_yrli1"]
+[ext_resource type="Shader" uid="uid://c7raogrykwanp" path="res://shaders/retro_sky.gdshader" id="11_sky"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_sky"]
+shader = ExtResource("11_sky")
+shader_parameter/top_color = Color(0, 0, 0, 1)
+shader_parameter/horizon_color = Color(0.10877361, 0.017054413, 9.024516e-09, 1)
+shader_parameter/ground_color = Color(0, 0, 0, 1)
+shader_parameter/gradient_curve = 0.6
+shader_parameter/star_scale = 120.0
+shader_parameter/star_coverage = 0.0250000011875
+shader_parameter/star_size = 0.5
+shader_parameter/star_brightness = 1.5
+shader_parameter/twinkle_speed = 3.0
+shader_parameter/twinkle_strength = 0.818000038855
+shader_parameter/horizon_fade = 0.30800001463
+shader_parameter/meteor_color = Color(1, 0.95, 0.85, 1)
+shader_parameter/meteor_period = 7.0
+shader_parameter/meteor_chance = 0.7
+shader_parameter/meteor_duration = 1.1
+shader_parameter/meteor_length = 0.35
+shader_parameter/meteor_thickness = 0.02
+shader_parameter/meteor_brightness = 2.0
+
+[sub_resource type="Sky" id="Sky_yrli1"]
+sky_material = SubResource("ShaderMaterial_sky")
+process_mode = 3
+
+[sub_resource type="Environment" id="Environment_retro"]
+background_mode = 2
+background_color = Color(0.6330065, 0.55646235, 0.70855457, 1)
+sky = SubResource("Sky_yrli1")
+fog_light_color = Color(0.70912725, 0.5525139, 0.5284486, 1)
+fog_light_energy = 0.64
+fog_density = 0.0106
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_b5kf5"]
+albedo_texture = ExtResource("3_j40tv")
+texture_filter = 0
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_ed8b8"]
+radius = 1.551
+height = 6.59
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_l6ya2"]
+albedo_texture = ExtResource("9_21xg8")
+texture_filter = 0
+
+[sub_resource type="BoxMesh" id="BoxMesh_1kil2"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_5cvvu"]
+
+[node name="GameScene" type="Node3D" unique_id=2145934823]
+
+[node name="RetroDisplay" type="SubViewportContainer" parent="." unique_id=360412783]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+stretch = true
+stretch_shrink = 3
+
+[node name="WorldViewport" type="SubViewport" parent="RetroDisplay" unique_id=1521270065]
+handle_input_locally = false
+size = Vector2i(384, 216)
+render_target_update_mode = 4
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="RetroDisplay/WorldViewport" unique_id=1278029400]
+environment = SubResource("Environment_retro")
+
+[node name="Car" type="CharacterBody3D" parent="RetroDisplay/WorldViewport" unique_id=1054836782]
+transform = Transform3D(-1, 0, -8.74228e-08, 0, 1, 0, 8.74228e-08, 0, -1, 0, 0, 0)
+script = ExtResource("1_pynjx")
+
+[node name="Camera3D" type="Camera3D" parent="RetroDisplay/WorldViewport/Car" unique_id=1111731412 node_paths=PackedStringArray("target")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.81585e-06, 3.70274, 6.65703)
+script = ExtResource("2_yrli1")
+target = NodePath("..")
+look_ahead = 7.0
+look_ahead_up = 3.0
+
+[node name="Car_Mesh" type="MeshInstance3D" parent="RetroDisplay/WorldViewport/Car" unique_id=799208253]
+transform = Transform3D(-1, 0, -8.74228e-08, 0, 1, 0, 8.74228e-08, 0, -1, 0.0167998, 0, -2.25054)
+material_override = SubResource("StandardMaterial3D_b5kf5")
+mesh = ExtResource("4_6pl24")
+skeleton = NodePath("../..")
+
+[node name="Car_Collider" type="CollisionShape3D" parent="RetroDisplay/WorldViewport/Car" unique_id=252409072]
+transform = Transform3D(1, -7.1054274e-15, 4.2351647e-22, 0, -4.371139e-08, -1, 7.1054274e-15, 1, -4.371139e-08, 0, 1.3046767, -2.32)
+shape = SubResource("CapsuleShape3D_ed8b8")
+
+[node name="GameManager" type="Node" parent="RetroDisplay/WorldViewport" unique_id=1594595211 node_paths=PackedStringArray("car", "map_generator", "test_floor")]
+script = ExtResource("5_w22tq")
+car = NodePath("../Car")
+map_generator = NodePath("../MapGenerator")
+test_floor = NodePath("../RigidBody3D")
+
+[node name="MapGenerator" type="Node3D" parent="RetroDisplay/WorldViewport" unique_id=1145174937]
+script = ExtResource("6_e8rlm")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="RetroDisplay/WorldViewport" unique_id=1176574857]
+transform = Transform3D(0.86601907, -0.3535631, 0.3535593, 0, 0.70710295, 0.7071106, -0.500011, -0.61237127, 0.61236465, 0, 50, 0)
+shadow_enabled = true
+
+[node name="SkidMarks" type="Node3D" parent="RetroDisplay/WorldViewport" unique_id=1552121723 node_paths=PackedStringArray("car")]
+script = ExtResource("8_kxqg4")
+car = NodePath("../Car")
+
+[node name="RigidBody3D" type="RigidBody3D" parent="RetroDisplay/WorldViewport" unique_id=789432636]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -150, 0)
+axis_lock_linear_x = true
+axis_lock_linear_y = true
+axis_lock_linear_z = true
+axis_lock_angular_x = true
+axis_lock_angular_y = true
+axis_lock_angular_z = true
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="RetroDisplay/WorldViewport/RigidBody3D" unique_id=513079124]
+transform = Transform3D(300, 0, 0, 0, 300, 0, 0, 0, 300, 0, 0, 0)
+material_override = SubResource("StandardMaterial3D_l6ya2")
+mesh = SubResource("BoxMesh_1kil2")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="RetroDisplay/WorldViewport/RigidBody3D" unique_id=735654899]
+transform = Transform3D(300, 0, 0, 0, 300, 0, 0, 0, 300, -0.103882, -1.52588e-05, 0.229858)
+shape = SubResource("BoxShape3D_5cvvu")
+
+[node name="DebugConsole" type="Node3D" parent="." unique_id=493121970 node_paths=PackedStringArray("world_viewport")]
+script = ExtResource("7_qitmq")
+world_viewport = NodePath("../RetroDisplay/WorldViewport")
+
+[node name="ActionCamController" type="SubViewportContainer" parent="." unique_id=323128645]
+offset_left = 722.0
+offset_top = 281.0
+offset_right = 1283.0
+offset_bottom = 793.0
+scale = Vector2(0.6665195, 0.535767)
+
+[node name="Window" type="Sprite2D" parent="ActionCamController" unique_id=142336720]
+position = Vector2(280.56195, 326.63452)
+scale = Vector2(1.02, 1.02)
+texture = ExtResource("10_yrli1")
+
+[node name="SubViewport" type="SubViewport" parent="ActionCamController" unique_id=1879630631]
+transparent_bg = true
+handle_input_locally = false
+size = Vector2i(561, 512)
+render_target_update_mode = 4
+
+[node name="DriftActionCamera" type="Camera3D" parent="ActionCamController/SubViewport" unique_id=1145768317]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.5986862, 0.78279305)
