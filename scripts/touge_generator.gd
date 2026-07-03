@@ -4,7 +4,7 @@ extends Node3D
 @export var segment_count: int = 300
 @export var road_width: float = 11.0
 @export var segment_length: float = 4.0
-@export var elevation_gain: float = 180.0
+@export var elevation_gain: float = 250.0
 @export var guardrail_height: float = 1.2
 
 @export_group("Curvature")
@@ -17,10 +17,16 @@ extends Node3D
 @export var heading_bounce_back: float = 0.05
 @export var hairpin_cooldown_segments: int = 18
 
+@export_group("Banking")
+@export var enable_banking: bool = true
+@export var bank_strength: float = 0.6           # curvature -> bank angle multiplier
+@export var max_bank_angle: float = 22.0         # cap on how far a corner tilts (deg)
+@export var bank_window: int = 2                 # points each side used to measure curvature
+
 @export_group("Self-Overlap Guard")
-@export var min_self_distance: float = 14.0
+@export var min_self_distance: float = 22.0
 @export var self_check_min_gap: int = 10
-@export var max_generation_attempts: int = 25
+@export var max_generation_attempts: int = 40
 
 @export_group("Scenery")
 @export var enable_signs: bool = true
@@ -179,6 +185,36 @@ func _compute_frames() -> void:
 		road_forwards.append(fwd)
 		road_rights.append(right)
 
+	_apply_banking()
+
+func _apply_banking() -> void:
+	# Superelevation: tilt each cross-section into the curve so the inside edge
+	# sits lower than the outside. Gravity then helps pull the car through the
+	# corner instead of pushing it off - flowing, and much easier to hold.
+	if not enable_banking:
+		return
+
+	var n := road_points.size()
+	var max_bank := deg_to_rad(max_bank_angle)
+	# Work off a copy so each point measures the un-tilted (flat) headings.
+	var flat_rights := road_rights.duplicate()
+
+	for i in n:
+		var a := maxi(i - bank_window, 0)
+		var b := mini(i + bank_window, n - 1)
+		var fa := Vector3(road_forwards[a].x, 0.0, road_forwards[a].z)
+		var fb := Vector3(road_forwards[b].x, 0.0, road_forwards[b].z)
+		if fa.length() < 0.001 or fb.length() < 0.001:
+			continue
+
+		# Signed curvature: positive means the road is turning toward +right.
+		var turn: float = (fb.normalized() - fa.normalized()).dot(flat_rights[i])
+		var bank := clampf(turn * bank_strength, -max_bank, max_bank)
+
+		# Roll the right vector in the right/up plane; +turn drops the inside (+right) edge.
+		var r: Vector3 = flat_rights[i]
+		road_rights[i] = (r * cos(bank) - Vector3.UP * sin(bank)).normalized()
+
 func _quad(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3, normal: Vector3) -> void:
 	st.set_normal(normal)
 	st.add_vertex(a)
@@ -332,10 +368,12 @@ func _build_terrain() -> void:
 	# Uphill embankment (+right): gentle, drivable rise. Cliff (-right): a narrow
 	# verge, then a near-vertical face dropping far to a valley floor - steeper
 	# than the car's floor_max_angle, so leaving the road here means falling.
-	var shoulder_w := 3.0
-	var embank_w := 40.0
-	var embank_rise := 8.0
-	var valley_w := 40.0
+	# Kept narrow on purpose: a wide apron would reach sideways into adjacent
+	# switchback passes and poke green terrain up through the road there.
+	var shoulder_w := 2.5
+	var embank_w := 8.0
+	var embank_rise := 5.0
+	var valley_w := 25.0
 
 	for i in road_points.size() - 1:
 		var r0 := road_rights[i]

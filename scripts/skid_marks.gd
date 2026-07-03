@@ -56,7 +56,7 @@ func _physics_process(_delta: float) -> void:
 	var vel_dir: Vector3 = vel_flat.normalized()
 
 	var slip: float = forward_dir.cross(vel_dir).length()
-	var is_sliding: bool = slip > slip_threshold
+	var _is_sliding: bool = slip > slip_threshold
 
 	var side_dir: Vector3 = car.global_transform.basis.x
 	var rear_center: Vector3 = car.global_position + forward_dir * rear_axle_offset

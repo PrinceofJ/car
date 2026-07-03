@@ -29,6 +29,7 @@ extends CharacterBody3D
 @export var landing_smooth_speed: float = 12.0
 @export var slope_slip_force: float = 45.0
 @export var slope_align_speed: float = 8.0
+@export var floor_normal_smooth: float = 10.0    # low-pass on the floor normal to kill facet jitter
 
 @export_category("Airborne Physics")
 @export var auto_nose_dive: float = 1.5
@@ -40,6 +41,7 @@ var steering_angle: float = 0.0
 var is_drifting: bool = false
 var current_traction: float = 0.10
 var time_since_floor: float = 0.0
+var smoothed_floor_normal: Vector3 = Vector3.UP
 var visual_y_offset: float = 0.0
 
 func _ready() -> void:
@@ -54,6 +56,7 @@ func _physics_process(delta: float) -> void:
 	calculate_drift_movement(delta)
 	
 	handle_air_physics(delta)
+	update_floor_normal(delta)
 	apply_slope_slippage(delta)
 	align_with_floor(delta)
 	
@@ -199,11 +202,20 @@ func calculate_drift_movement(delta: float) -> void:
 	velocity = velocity.lerp(target_velocity, current_traction)
 	velocity.y = y_vel
 
+func update_floor_normal(delta: float) -> void:
+	# The road collision mesh is faceted (two triangles per quad, non-planar once
+	# banked), so get_floor_normal() steps between values as the car crosses
+	# triangle edges. Low-pass it so alignment and slope-slip read a stable normal
+	# instead of shaking frame to frame.
+	var t := clampf(floor_normal_smooth * delta, 0.0, 1.0)
+	var target := get_floor_normal() if is_on_floor() else Vector3.UP
+	smoothed_floor_normal = smoothed_floor_normal.slerp(target, t).normalized()
+
 func align_with_floor(delta: float) -> void:
 	if not is_on_floor():
-		return 
-		
-	var normal: Vector3 = get_floor_normal()
+		return
+
+	var normal: Vector3 = smoothed_floor_normal
 	var current_forward: Vector3 = -global_transform.basis.z
 	
 	# Calculate the new 'right' vector horizontally across the slope
@@ -222,7 +234,7 @@ func align_with_floor(delta: float) -> void:
 
 func apply_slope_slippage(delta: float) -> void:
 	if is_on_floor():
-		var normal: Vector3 = get_floor_normal()
+		var normal: Vector3 = smoothed_floor_normal
 		# If normal.y is less than 0.99, the car is on an angled slope
 		if normal.y < 0.99:
 			# Calculate the physical downward force sliding along the surface

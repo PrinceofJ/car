@@ -11,6 +11,8 @@
 [ext_resource type="Texture2D" uid="uid://cv0dahngrhyon" path="res://assets/vector-grid-marking-user-hud-interface_1284-52212.png" id="9_21xg8"]
 [ext_resource type="Texture2D" uid="uid://ctf6i5qrtghph" path="res://adcvq7cfkgu16c8asek54nboqs-7849c90e685cfc97bcc81d3fb1db0e5a.png" id="10_yrli1"]
 [ext_resource type="Shader" uid="uid://c7raogrykwanp" path="res://shaders/retro_sky.gdshader" id="11_sky"]
+[ext_resource type="Script" uid="uid://nd5mcegxdgap" path="res://scripts/engine_sound.gd" id="12_engine"]
+[ext_resource type="Script" uid="uid://bgrwoh6gvwjpw" path="res://scripts/tire_screech.gd" id="13_screech"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_sky"]
 shader = ExtResource("11_sky")
@@ -82,6 +84,11 @@ environment = SubResource("Environment_retro")
 [node name="Car" type="CharacterBody3D" parent="RetroDisplay/WorldViewport" unique_id=1054836782]
 transform = Transform3D(-1, 0, -8.74228e-08, 0, 1, 0, 8.74228e-08, 0, -1, 0, 0, 0)
 script = ExtResource("1_pynjx")
+acceleration = 19.0
+max_speed = 40.0
+steering_speed = 6.0
+normal_traction = 0.5
+drift_traction = 0.02
 
 [node name="Camera3D" type="Camera3D" parent="RetroDisplay/WorldViewport/Car" unique_id=1111731412 node_paths=PackedStringArray("target")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.81585e-06, 3.70274, 6.65703)
@@ -104,15 +111,21 @@ shape = SubResource("CapsuleShape3D_ed8b8")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.8452251, 0.9557537, -5.378865)
 light_energy = 16.0
 spot_range = 4096.0
-spot_attenuation = 1.6
-spot_angle = 26.46
+spot_angle = 23.37
 
 [node name="SpotLight3D" type="SpotLight3D" parent="RetroDisplay/WorldViewport/Car" unique_id=133020218]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.66668403, 0.9580708, -5.5669994)
 light_energy = 16.0
 spot_range = 4096.0
-spot_attenuation = 1.6
-spot_angle = 26.46
+spot_angle = 23.37
+
+[node name="EngineSound" type="AudioStreamPlayer" parent="RetroDisplay/WorldViewport/Car" unique_id=1694241884]
+volume_db = -38.413
+script = ExtResource("12_engine")
+
+[node name="TireScreech" type="AudioStreamPlayer" parent="RetroDisplay/WorldViewport/Car" unique_id=497043008]
+volume_db = -39.753
+script = ExtResource("13_screech")
 
 [node name="GameManager" type="Node" parent="RetroDisplay/WorldViewport" unique_id=1594595211 node_paths=PackedStringArray("car", "map_generator", "test_floor")]
 script = ExtResource("5_w22tq")
@@ -122,10 +135,12 @@ test_floor = NodePath("../RigidBody3D")
 
 [node name="MapGenerator" type="Node3D" parent="RetroDisplay/WorldViewport" unique_id=1145174937]
 script = ExtResource("6_e8rlm")
+seed_value = 888
+road_width = 13.0
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="RetroDisplay/WorldViewport" unique_id=1176574857]
 transform = Transform3D(0.86601907, -0.3535631, 0.3535593, 0, 0.70710295, 0.7071106, -0.500011, -0.61237127, 0.61236465, 0, 50, 0)
-light_energy = 0.1
+light_energy = 0.3
 shadow_enabled = true
 
 [node name="SkidMarks" type="Node3D" parent="RetroDisplay/WorldViewport" unique_id=1552121723 node_paths=PackedStringArray("car")]
@@ -155,6 +170,7 @@ script = ExtResource("7_qitmq")
 world_viewport = NodePath("../RetroDisplay/WorldViewport")
 
 [node name="ActionCamController" type="SubViewportContainer" parent="." unique_id=323128645]
+visible = false
 offset_left = 722.0
 offset_top = 281.0
 offset_right = 1283.0
@@ -170,7 +186,7 @@ texture = ExtResource("10_yrli1")
 transparent_bg = true
 handle_input_locally = false
 size = Vector2i(561, 512)
-render_target_update_mode = 4
+render_target_update_mode = 0
 
 [node name="DriftActionCamera" type="Camera3D" parent="ActionCamController/SubViewport" unique_id=1145768317]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.5986862, 0.78279305)

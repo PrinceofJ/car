@@ -11,7 +11,7 @@ func _ready() -> void:
 	else:
 		_setup_test_floor()
 
-func _process(delta: float) -> void:
+func _process(_delta: float) -> void:
 	if Input.is_action_just_pressed("Reset"):
 		car.velocity = Vector3.ZERO
 		_setup_touge()
